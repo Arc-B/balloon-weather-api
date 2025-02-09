@@ -23,11 +23,9 @@ def fetch_balloon_data():
     if response.status_code == 200:
         try:
             balloon_data = response.json()
-            #print("Raw Balloon Data (First 5):", balloon_data[:5])  # Print first 5 entries
-            
             if isinstance(balloon_data, list) and len(balloon_data) > 0:
                 balloon_data = [entry for entry in balloon_data if len(entry) == 3 and all(np.isfinite(entry))]
-                print("Filtered Balloon Data (First 5):", balloon_data[:5])  # Debug valid data
+                print("Filtered Balloon Data (First 5):", balloon_data[:5])  
                 return balloon_data
             else:
                 print("Unexpected or Empty Balloon Data")
@@ -37,9 +35,9 @@ def fetch_balloon_data():
             return []
     print("Failed to fetch Balloon Data")
     return []
-    
+
 # Step 2: Spatial Binning - Reduce API Calls
-BIN_SIZE = 2.0  # Larger bin size reduces API calls
+BIN_SIZE = 2.0  
 
 def bin_coordinates(balloon_data):
     binned_coords = defaultdict(list)
@@ -58,7 +56,7 @@ def bin_coordinates(balloon_data):
 async def fetch_weather(session, lat, lon):
     params = {"lat": lat, "lon": lon, "appid": weather_api_key, "units": "metric"}
     
-    for attempt in range(3):  # Retry up to 3 times
+    for attempt in range(3):  
         async with session.get(weather_url, params=params) as response:
             if response.status == 200:
                 try:
@@ -66,16 +64,16 @@ async def fetch_weather(session, lat, lon):
                 except Exception as e:
                     print(f"JSON Parsing Error for ({lat}, {lon}): {e}")
                     return None
-            elif response.status == 429:  # Too Many Requests
+            elif response.status == 429:  
                 print(f"Rate limit hit! Waiting before retrying ({lat}, {lon})...")
-                time.sleep(5)  # Only sleep when rate limit is hit
+                time.sleep(5)  
             else:
-                print(f" Weather API failed for ({lat}, {lon}) - Status Code: {response.status}")
+                print(f"Weather API failed for ({lat}, {lon}) - Status Code: {response.status}")
                 return None
     return None
 
 # Step 4: Fetch All Weather Data Efficiently
-cached_weather_data = {}  # Cache dictionary
+cached_weather_data = {}  
 
 async def get_all_weather(binned_coords):
     global cached_weather_data
@@ -101,9 +99,9 @@ async def get_all_weather(binned_coords):
                     "weather_desc": result["weather"][0]["description"],
                 }
                 weather_data[key] = weather_info
-                cached_weather_data[key] = weather_info  # Store in cache
+                cached_weather_data[key] = weather_info  
 
-    print(f" Retrieved Weather Data for {len(weather_data)} locations")
+    print(f"Retrieved Weather Data for {len(weather_data)} locations")
     return weather_data
 
 # Step 5: API Endpoint (Serve JSON Data)
@@ -112,12 +110,15 @@ def balloon_weather():
     balloon_data = fetch_balloon_data()
     
     if not balloon_data:
-        print(" No balloon data available, returning error")
+        print("No balloon data available, returning error")
         return jsonify({"error": "No balloon data available"}), 500
 
     binned_coords = bin_coordinates(balloon_data)
     weather_results = asyncio.run(get_all_weather(binned_coords))
-    
+
+    if not weather_results:  
+        return jsonify({"error": "Weather API rate limit exceeded. Please try again later."}), 429
+
     weather_data = []
     for (bin_lat, bin_lon), balloons in binned_coords.items():
         if (bin_lat, bin_lon) in weather_results:
@@ -133,7 +134,7 @@ def balloon_weather():
                     "weather_desc": weather_info["weather_desc"]
                 })
 
-    print(f" Final API Response contains {len(weather_data)} entries")
+    print(f"Final API Response contains {len(weather_data)} entries")
     return jsonify(weather_data)
 
 @app.route("/")
@@ -154,13 +155,13 @@ def get_plot():
 
     fig = go.Figure()
     fig.add_trace(go.Scatter3d(
-        x=[data[1] for data in weather_data],  # Longitude
-        y=[data[0] for data in weather_data],  # Latitude
-        z=[data[2] for data in weather_data],  # Altitude
+        x=[data[1] for data in weather_data],  
+        y=[data[0] for data in weather_data],  
+        z=[data[2] for data in weather_data],  
         mode='markers',
         marker=dict(
             size=6,
-            color=[data[2] for data in weather_data],  # Color by altitude
+            color=[data[2] for data in weather_data],  
             colorscale='Jet',
             opacity=0.8
         ),
