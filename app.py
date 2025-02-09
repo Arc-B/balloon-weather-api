@@ -36,8 +36,7 @@ def fetch_balloon_data():
             print(f"Error parsing Balloon API JSON: {e}")
             return []
     print("Failed to fetch Balloon Data")
-    return []
-
+    return "Probably a rate limit exceed issue. Please try after sometime. Sorry"
 # Step 2: Spatial Binning - Reduce API Calls
 BIN_SIZE = 2.0  # Larger bin size reduces API calls
 
